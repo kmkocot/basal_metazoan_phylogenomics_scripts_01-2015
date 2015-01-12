@@ -1,7 +1,7 @@
 # basal_metazoan_phylogenomics_scripts_01-2015
 Scripts used for basal metazoan phylogenomics
 
-This script takes the output of HAMSTR and performs several steps to remove groups and sequences that are not suitable for phylogenomic analysis.
+basalMetazoan_orthologyScript_HaMSTR13_parallel.sh takes the output of HAMSTR and performs several steps to remove groups and sequences that are not suitable for phylogenomic analysis.
 
 The final product of this script is a set of trimmed amino acid alignments representing putatively orthologous groups suitable for phylogenomic analysis.
 
