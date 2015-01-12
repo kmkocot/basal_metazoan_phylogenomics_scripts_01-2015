@@ -7,7 +7,7 @@ The final product of this script is a set of trimmed amino acid alignments repre
 
 This version of the script requires GNU parallel be installed on your machine.
 
-A number of programs must also be in the path including Aliscore, Alicut, MAFFT PhyloTreePruner, and the uniqHaplo.pl script.
+A number of programs must also be in the path including Aliscore, Alicut, MAFFT PhyloTreePruner, HaMStR (for nentferner.pl), and the uniqHaplo.pl script.
 
 The path for AlignmentCompare (packaged with this script) must be specified inside the script. 
 
