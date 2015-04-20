@@ -20,7 +20,7 @@
 #The final product of this script is a set of trimmed amino acid alignments representing putatively orthologous groups suitable for phylogenomic analysis.
 #This version of the script requires GNU parallel be installed on your machine.
 #A number of programs must also be in the path including Aliscore, Alicut, MAFFT PhyloTreePruner, HaMStR (for nentferner.pl), and the uniqHaplo.pl script.
-#The path for AlignmentCompare (packaged with this script) must be specified inside the script.
+#The path for AlignmentCompare (packaged with this script) must be specified inside the script and compiled prior to running this script.
 #A number of variables must be modified for your purposes within the bash script. We suggest you examine the entire script carefully and modify it as needed.
 #Input fasta file headers must be in the following format: >orthology_group_ID|species_name_abbreviation|annotation_or_sequence_ID_information
 #Example: >0001|LGIG|Contig1234
@@ -35,7 +35,7 @@ MIN_SEQUENCE_LENGTH=50 #Deletes original seqs shorter than this length
 MIN_ALIGNMENT_LENGTH=50 #Minimum length of a trimmed alignment in amino acids
 MIN_TAXA=37 #Minimum number of OTUs to keep an OG
 CORES=2 #NUMBER OF CORES TO USE IN PARALLEL
-CLASS_PATH=/usr/local/genome/bin/ #Location of PhyloTreePruner .class files
+CLASS_PATH=/usr/local/genome/bin/ #Location of PhyloTreePruner and Alignment Compare .class files
 ########################################################################
 
 
@@ -61,6 +61,8 @@ echo
 
 #Changes any name that was XSP. to XSPP and removed anything after the first space in the fasta header
 #This step was specific to one taxon naming issue in this analysis and probably won't be relevant to other users
+#PLEASE CHECK THAT THESE STEPS ARE APPROPRIATE FOR YOUR FASTA HEADERS BEFORE RUNNING
+
 echo "Fixing taxon abbreviations..." 
 #sed -i 's/SP.|/SPP|/' *.fa
 sed -i 's/ .*//g' *.fa
@@ -166,7 +168,7 @@ echo
 
 #Trim alignments using aliscore and alicut
 echo "Trimming alignments in aliscore and alicut..."
-##GET HEADERS RIGHT!
+##GET HEADERS RIGHT! Aliscore and alicut do not like the "|" symbol
 sed -i 's/|/\_/g' *.fa ##MAKE ALL | underscores
 sed -i 's/\_/@/' *.fa #CHANGES First Underscore to @
 echo Done
@@ -208,7 +210,8 @@ echo
 
 
 #Remove spaces in sequences and delete gap-only columns and columns with four or fewer non-gap characters.
-echo "Removing gap-only columns..."
+#This is somewhat complicated awk min-program, but it works...
+echo "Removing gap-only columns..." 
 for FILENAME in *.fa
 do
 awk 'BEGIN { FS = "" }
@@ -251,26 +254,24 @@ echo Done
 echo
 
 
-#Remove any sequences that don't overlap with all other sequences by at least 20 amino acids. This check runs until all seq
+#Remove any sequences that don't overlap with all other sequences by at least 20 amino acids. 
 echo "Removing short sequences that don't overalp with all other sequences by at least 20 AAs..."
-#ls *.fa | parallel -j 7 'java -cp /usr/local/genome/bin AlignmentCompare {}'
-
 for FILENAME in *.fa
 do
-java -cp /usr/local/genome/bin AlignmentCompare $FILENAME
+java -cp $CLASS_PATH AlignmentCompare $FILENAME 
 done
 echo Done
 echo
 rm -rf myTempFile.txt
 
 
-#If fewer than $MIN_TAXA different species are represented in the file, move that file to the "rejected_few_taxa_2" directo
+#If fewer than $MIN_TAXA different species are represented in the file, move that file to the "rejected_few_taxa_2" directory
 echo "Removing groups with fewer than $MIN_TAXA taxa..."
 mkdir -p rejected_few_taxa_2
 for FILENAME in *.fa
 do
-awk -F "|" '/^>/{ taxon[$2]++ } END{for(o in taxon){print o,taxon[o]}}' $FILENAME > $FILENAME\.taxon_count #Creates tempora
-taxon_count=`grep -v 0 $FILENAME\.taxon_count | wc -l` #Counts the number of lines with an integer >0 (= the number of taxa
+awk -F "|" '/^>/{ taxon[$2]++ } END{for(o in taxon){print o,taxon[o]}}' $FILENAME > $FILENAME\.taxon_count 
+taxon_count=`grep -v 0 $FILENAME\.taxon_count | wc -l` #Counts the number of lines with an integer >0 (i.e. the number of taxa for each OG)
 if [ "$taxon_count" -lt "$MIN_TAXA" ] ; then 
 echo $FILENAME
 mv $FILENAME ./rejected_few_taxa_2/
@@ -284,7 +285,7 @@ echo
 echo "Making a backup of remaining .fa files and changing headers to remove OG number before making single copy alignments"
 mkdir backup_pre-PhyloTreePruner
 cp *.fa ./backup_pre-PhyloTreePruner/
-sed -i 's/>[0-9][0-9][0-9][0-9]|/>/g' *.fa ##CHANGE IF ORTHOMCL!!!
+sed -i 's/>[0-9][0-9][0-9][0-9]|/>/g' *.fa ##CHANGE IF YOUR OGs HAVE MORE THAN FOUR ZEROS !!! (e.g. if five change to 's/>[0-9][0-9][0-9][0-9][0-9]|/>/g')
 sed -i 's/|/\_/' *.fa 
 sed -i 's/\_/@/' *.fa
 echo Done
@@ -293,7 +294,7 @@ echo
 
 #Make single-gene trees in FastTree
 echo "Making single-gene trees in FastTree..."
-export OMP_NUM_THREADS=$CORES
+export OMP_NUM_THREADS=$CORES ##This tells fast tree to only use the number of cores used in other parallel steps
 for FILENAME in *.fa
 do
 FastTreeMP -slow -gamma $FILENAME > $FILENAME.tre
@@ -311,10 +312,10 @@ ORTHOLOGY_GROUP=`echo $FILENAME | cut -d . -f 1 | sed 's/.\+\///g'`
 echo $ORTHOLOGY_GROUP
 ###################################################################################
 ####You may want to change some of the PhyloTreePruner settings in the next line###
+############See PhyloTreePruner Manual for more information########################
 ###################################################################################
-java -cp $CLASS_PATH PhyloTreePruner $ORTHOLOGY_GROUP".tre" $MIN_TAXA $ORTHOLOGY_GROUP".fa" 0.99 u
+java -cp $CLASS_PATH PhyloTreePruner $ORTHOLOGY_GROUP".tre" $MIN_TAXA $ORTHOLOGY_GROUP".fa" 0.99 u  
 done
 echo Done
-echo
-echo End of script!
+
 
